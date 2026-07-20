@@ -5,6 +5,7 @@
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <title>HYDRO-OS v4.2 | Erai Dam Operations Control</title>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&amp;family=Space+Grotesk:wght@600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
   <script id="tailwind-config">
@@ -761,7 +762,7 @@
             </div>
 
             <!-- Generate PDF Report Button -->
-            <button class="w-full bg-surface-container-highest hover:bg-surface-variant/50 text-on-surface border border-outline-variant/40 py-2.5 rounded-xl font-bold text-label-md uppercase hover:brightness-110 active:scale-[0.98] transition-all mt-8 flex items-center justify-center gap-2">
+            <button id="btn-generate-pdf" class="w-full bg-surface-container-highest hover:bg-surface-variant/50 text-on-surface border border-outline-variant/40 py-2.5 rounded-xl font-bold text-label-md uppercase hover:brightness-110 active:scale-[0.98] transition-all mt-8 flex items-center justify-center gap-2">
               <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
               Generate PDF Report
             </button>
@@ -1004,7 +1005,7 @@
     const simVolSlider = document.getElementById('sim-vol-slider');
     const simVolVal = document.getElementById('sim-vol-val');
     const simBtn = document.getElementById('sim-btn');
-    const simulationStatusEl = document.getElementById('simulation-status');
+    const simulationStatusEl = document.getElementById('simulation-status') || document.createElement('span');
 
     const gateG1Bar = document.getElementById('gate-g1-bar');
     const gateG1Label = document.getElementById('gate-g1-label');
@@ -1247,12 +1248,12 @@
       volumeSliderVal.textContent = `${(volumeSlider.value / 1000000).toFixed(1)}M m³`;
     });
 
-    simRainSlider.addEventListener('input', () => {
-      simRainVal.textContent = `${simRainSlider.value} mm`;
+    if (simRainSlider) simRainSlider.addEventListener('input', () => {
+      if (simRainVal) simRainVal.textContent = `${simRainSlider.value} mm`;
     });
 
-    simVolSlider.addEventListener('input', () => {
-      simVolVal.textContent = `${(simVolSlider.value / 1000000).toFixed(1)}M m³`;
+    if (simVolSlider) simVolSlider.addEventListener('input', () => {
+      if (simVolVal) simVolVal.textContent = `${(simVolSlider.value / 1000000).toFixed(1)}M m³`;
     });
 
     // POST Telemetry
@@ -1286,7 +1287,7 @@
     });
 
     // Run Simulation
-    simBtn.addEventListener('click', async () => {
+    if (simBtn) simBtn.addEventListener('click', async () => {
       simBtn.disabled = true;
       simBtn.textContent = 'Simulating...';
       try {
@@ -1485,6 +1486,178 @@
       switchTab(navTelemetry, pageTelemetry);
       loadDamStatus();
     });
+    // Generate PDF Report
+    const pdfBtn = document.getElementById('btn-generate-pdf');
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', async () => {
+        pdfBtn.disabled = true;
+        pdfBtn.innerHTML = `<span class="material-symbols-outlined text-[18px]">hourglass_top</span> Generating...`;
+        try {
+          // Fetch live data
+          const res = await fetch(`${API_BASE}/status`);
+          if (!res.ok) throw new Error('Could not fetch live data');
+          const data = await res.json();
+          const s = data.state;
+          const log = data.latestLog;
+
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+          const W = doc.internal.pageSize.getWidth();
+          const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+          const capPct = ((s.currentVolumeM3 / 226500000) * 100).toFixed(1);
+
+          // ── Header Band ──────────────────────────────────────────────────
+          doc.setFillColor(11, 19, 38);
+          doc.rect(0, 0, W, 30, 'F');
+          doc.setTextColor(79, 219, 200);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(16);
+          doc.text('HYDRO-OS v4.2  |  ERAI DAM OPERATIONS REPORT', 14, 13);
+          doc.setFontSize(8);
+          doc.setTextColor(190, 200, 210);
+          doc.text(`Erai River Basin, Chandrapur, Maharashtra  •  Generated: ${now} IST`, 14, 20);
+          doc.setDrawColor(79, 219, 200);
+          doc.setLineWidth(0.5);
+          doc.line(14, 26, W - 14, 26);
+
+          // ── Section: Reservoir State ──────────────────────────────────────
+          let y = 36;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+          doc.setTextColor(30, 30, 50);
+          doc.setFillColor(237, 244, 255);
+          doc.rect(14, y - 5, W - 28, 8, 'F');
+          doc.setTextColor(11, 60, 100);
+          doc.text('RESERVOIR STATE', 16, y);
+          y += 8;
+
+          const stateRows = [
+            ['Current Volume', `${(s.currentVolumeM3 / 1e6).toFixed(2)} M m³`, 'Max Capacity', '226.50 M m³'],
+            ['Water Level', `${s.waterLevelMeters.toFixed(2)} m`, 'Storage Utilisation', `${capPct}%`],
+            ['Gate Open %', `${s.gateOpenPercentage.toFixed(1)}%`, 'Current Outflow', `${s.currentOutflowM3s.toFixed(2)} m³/s`],
+          ];
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          stateRows.forEach(row => {
+            doc.setTextColor(80, 80, 100);
+            doc.text(row[0] + ':', 16, y);
+            doc.setTextColor(20, 20, 40);
+            doc.setFont('helvetica', 'bold');
+            doc.text(row[1], 65, y);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(80, 80, 100);
+            doc.text(row[2] + ':', 110, y);
+            doc.setTextColor(20, 20, 40);
+            doc.setFont('helvetica', 'bold');
+            doc.text(row[3], 160, y);
+            doc.setFont('helvetica', 'normal');
+            y += 7;
+          });
+
+          // ── Section: Control Engine Decision ─────────────────────────────
+          y += 4;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+          doc.setFillColor(237, 244, 255);
+          doc.rect(14, y - 5, W - 28, 8, 'F');
+          doc.setTextColor(11, 60, 100);
+          doc.text('CONTROL ENGINE DECISION LOG', 16, y);
+          y += 8;
+
+          const logRows = [
+            ['Forecast Rainfall (72h)', `${log.forecastPrecipitationMm.toFixed(1)} mm`, 'Predicted Inflow', `${(log.predictedInflowM3 / 1e6).toFixed(2)} M m³`],
+            ['Recommended Outflow', `${log.recommendedOutflowM3s.toFixed(2)} m³/s`, 'Flood Alert', log.floodAlertTriggered ? '⚠ TRIGGERED' : 'NONE'],
+          ];
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          logRows.forEach(row => {
+            doc.setTextColor(80, 80, 100);
+            doc.text(row[0] + ':', 16, y);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(log.floodAlertTriggered && row[3] === '⚠ TRIGGERED' ? 180 : 20, 20, 40);
+            doc.text(row[1], 75, y);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(80, 80, 100);
+            doc.text(row[2] + ':', 110, y);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(20, 20, 40);
+            doc.text(row[3], 160, y);
+            doc.setFont('helvetica', 'normal');
+            y += 7;
+          });
+
+          // Status message box
+          y += 3;
+          doc.setFillColor(245, 248, 255);
+          doc.setDrawColor(180, 190, 210);
+          doc.roundedRect(14, y, W - 28, 18, 2, 2, 'FD');
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(8);
+          doc.setTextColor(60, 70, 100);
+          const splitMsg = doc.splitTextToSize(`Decision: ${log.statusMessage}`, W - 32);
+          doc.text(splitMsg, 17, y + 5);
+          y += 24;
+
+          // ── Section: Hydrological Parameters ────────────────────────────
+          y += 2;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+          doc.setFillColor(237, 244, 255);
+          doc.rect(14, y - 5, W - 28, 8, 'F');
+          doc.setTextColor(11, 60, 100);
+          doc.text('HYDROLOGICAL PARAMETERS', 16, y);
+          y += 8;
+
+          const hydroRows = [
+            ['Catchment Area', '439.33 km²', 'Runoff Coefficient', '0.60'],
+            ['Warning Threshold (85%)', '192.52 M m³', 'Max Safe Discharge', '800 m³/s'],
+            ['Saturation Index', '72.4%', 'Catchment Runoff Rate', '1.2 m/hr'],
+            ['Soil Permeability', 'High', 'Precipitation Density', '84%'],
+          ];
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          hydroRows.forEach(row => {
+            doc.setTextColor(80, 80, 100);
+            doc.text(row[0] + ':', 16, y);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(20, 20, 40);
+            doc.text(row[1], 75, y);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(80, 80, 100);
+            doc.text(row[2] + ':', 110, y);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(20, 20, 40);
+            doc.text(row[3], 160, y);
+            doc.setFont('helvetica', 'normal');
+            y += 7;
+          });
+
+          // ── Footer ────────────────────────────────────────────────────────
+          const footerY = doc.internal.pageSize.getHeight() - 14;
+          doc.setDrawColor(79, 219, 200);
+          doc.line(14, footerY - 4, W - 14, footerY - 4);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
+          doc.setTextColor(140, 150, 165);
+          doc.text('HYDRO-OS v4.2  |  Erai Dam Control System  |  Confidential — For Authorized Personnel Only', 14, footerY);
+          doc.text(`Page 1 of 1`, W - 28, footerY);
+
+          // ── Save ─────────────────────────────────────────────────────────
+          const filename = `Erai_Dam_Report_${new Date().toISOString().slice(0,10)}.pdf`;
+          doc.save(filename);
+        } catch (err) {
+          alert('PDF generation failed: ' + err.message);
+        } finally {
+          pdfBtn.disabled = false;
+          pdfBtn.innerHTML = `<span class="material-symbols-outlined text-[18px]">picture_as_pdf</span> Generate PDF Report`;
+        }
+      });
+    }
+
   </script>
 </body>
 </html>
