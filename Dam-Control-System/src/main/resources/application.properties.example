@@ -2,10 +2,10 @@ spring.application.name=Dam-Control-System
 server.port=8080
 
 # Database Configuration
-# Values are read from environment variables; falls back to local defaults
+# Copy this file to application.properties and fill in your own values
 spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/smart_dam_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
 spring.datasource.username=${SPRING_DATASOURCE_USERNAME:root}
-spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:tanmayyash2005}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:YOUR_MYSQL_PASSWORD_HERE}
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 
 # JPA/Hibernate Configuration
