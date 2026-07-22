@@ -442,6 +442,20 @@
             </div>
           </div>
         </div>
+        <!-- REGIONAL HYDRO-ALERTS & MEDIA FEED -->
+        <div id="card-news-feed" class="glass-card p-5 rounded-xl border border-outline-variant flex flex-col gap-4">
+          <div class="flex justify-between items-center pb-3 border-b border-outline-variant/30">
+            <h3 class="font-label-md text-primary font-bold flex items-center gap-2 uppercase tracking-wide">
+              <span class="material-symbols-outlined text-[20px]">newspaper</span>
+              Regional Hydro-Alerts & Media Feed
+            </h3>
+            <span class="text-[10px] font-bold font-mono text-tertiary bg-tertiary/15 px-2 py-0.5 rounded border border-tertiary/20">LIVE DATA FEED</span>
+          </div>
+
+          <div class="flex flex-col gap-3" id="news-headlines-container">
+            <!-- Dynamic headlines will be loaded here -->
+          </div>
+        </div>
       </div>
       <!-- Right (40%): Downstream Risk Matrix -->
       <div class="lg:col-span-4 flex flex-col gap-gutter">
@@ -1139,7 +1153,12 @@
         peakInflowDate: "Recorded: Aug 2024 Monsoon",
         avgPrecip: "48.5 mm",
         uptime: "99.98%",
-        numGates: 7
+        numGates: 7,
+        news: [
+          { text: "Chandrapur District Administration issues alert as Erai catchment receives 58mm rainfall.", time: "2 hours ago", type: "CRITICAL" },
+          { text: "State Highway 12 closed near Datala bridge due to minor flooding warning.", time: "5 hours ago", type: "WARNING" },
+          { text: "Central Water Commission forecasts steady reservoir inflows for Vidarbha region.", time: "1 day ago", type: "INFO" }
+        ]
       },
       khadakwasla: {
         id: "khadakwasla",
@@ -1159,7 +1178,12 @@
         peakInflowDate: "Recorded: Jul 2023 Monsoon",
         avgPrecip: "62.4 mm",
         uptime: "99.95%",
-        numGates: 11
+        numGates: 11,
+        news: [
+          { text: "Pune District Collector orders emergency warnings for Mutha river downstream beds.", time: "1 hour ago", type: "CRITICAL" },
+          { text: "Khadakwasla canal gate repairs completed ahead of heavy monsoon warnings.", time: "8 hours ago", type: "INFO" },
+          { text: "Water discharges into Mutha river bed scaled back to 2,500 cusecs.", time: "12 hours ago", type: "INFO" }
+        ]
       },
       panshet: {
         id: "panshet",
@@ -1179,7 +1203,11 @@
         peakInflowDate: "Recorded: Aug 2019 Monsoon",
         avgPrecip: "78.2 mm",
         uptime: "99.91%",
-        numGates: 6
+        numGates: 6,
+        news: [
+          { text: "Panshet and Varasgaon reservoirs touch 80% aggregate capacity; discharge expected.", time: "1 day ago", type: "WARNING" },
+          { text: "Tourism access suspended around Panshet catchment area due to heavy mist.", time: "2 days ago", type: "INFO" }
+        ]
       },
       mulshi: {
         id: "mulshi",
@@ -1199,7 +1227,11 @@
         peakInflowDate: "Recorded: Sep 2021 Monsoon",
         avgPrecip: "112.5 mm",
         uptime: "99.97%",
-        numGates: 6
+        numGates: 6,
+        news: [
+          { text: "Mulshi catchment area records highest precipitation of the season; tourist access suspended.", time: "3 hours ago", type: "CRITICAL" },
+          { text: "Tata Power hydro-generation station runs at peak capacity to manage inflows.", time: "6 hours ago", type: "INFO" }
+        ]
       }
     };
 
@@ -1359,6 +1391,35 @@
       document.getElementById('analytics-runoff-efficiency').textContent = `${(parseFloat(dam.coeffText) * 100).toFixed(1)}%`;
       document.getElementById('analytics-avg-precipitation').textContent = dam.avgPrecip;
       document.getElementById('analytics-uptime').textContent = dam.uptime;
+
+      // Update News Headlines dynamically
+      const newsContainer = document.getElementById('news-headlines-container');
+      if (newsContainer && dam.news) {
+        newsContainer.innerHTML = '';
+        dam.news.forEach(item => {
+          const div = document.createElement('div');
+          div.className = "flex gap-3 items-start pb-2.5 border-b border-outline-variant/10 last:border-0";
+          
+          let colorClass = "text-primary";
+          let icon = "info";
+          if (item.type === 'CRITICAL') {
+            colorClass = "text-error animate-pulse";
+            icon = "warning";
+          } else if (item.type === 'WARNING') {
+            colorClass = "text-tertiary";
+            icon = "gpp_maybe";
+          }
+          
+          div.innerHTML = `
+            <span class="material-symbols-outlined ${colorClass} mt-0.5 text-[18px]">${icon}</span>
+            <div class="flex-1">
+              <p class="text-xs text-on-surface font-sans leading-relaxed">${item.text}</p>
+              <span class="text-[9px] text-on-surface-variant font-mono uppercase">${item.time}</span>
+            </div>
+          `;
+          newsContainer.appendChild(div);
+        });
+      }
     }
 
     // Handle Telemetry sync
