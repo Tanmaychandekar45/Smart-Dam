@@ -38,28 +38,41 @@ public class DamController {
 
     /**
      * GET /api/v1/dam/status
-     * Returns current dam state and last control decision log.
+     * Returns current dam state and last control decision log for the default dam (Erai).
      */
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getDamStatus() {
-        // Retrieve or initialize default Reservoir State if DB is empty
-        ReservoirState state = reservoirStateRepository.findFirstByOrderByTimestampDesc()
+        return getDamStatus("erai");
+    }
+
+    /**
+     * GET /api/v1/dam/{damId}/status
+     * Returns current state and last decision log for the specified damId.
+     */
+    @GetMapping("/{damId}/status")
+    public ResponseEntity<Map<String, Object>> getDamStatus(@PathVariable String damId) {
+        com.SmartDam.Dam_Control_System.entity.DamMetadata meta = com.SmartDam.Dam_Control_System.entity.DamMetadata.get(damId);
+        
+        // Retrieve or initialize default Reservoir State if DB is empty for this dam
+        ReservoirState state = reservoirStateRepository.findFirstByDamIdOrderByTimestampDesc(meta.getId())
                 .orElseGet(() -> {
-                    log.info("No reservoir state found in database. Initializing default state...");
+                    log.info("No reservoir state found in database for dam {}. Initializing default state...", meta.getName());
                     ReservoirState defaultState = ReservoirState.builder()
+                            .damId(meta.getId())
                             .timestamp(LocalDateTime.now())
-                            .currentVolumeM3(181200000.0) // ~80% Capacity
-                            .waterLevelMeters(20.06)
+                            .currentVolumeM3(meta.getMaxCapacityM3() * 0.8) // ~80% Capacity
+                            .waterLevelMeters(meta.getMaxWaterLevelMeters() * 0.85) // Approximate water level
                             .currentOutflowM3s(0.0)
                             .gateOpenPercentage(0.0)
                             .build();
                     return reservoirStateRepository.save(defaultState);
                 });
 
-        ControlLog latestLog = controlLogRepository.findFirstByOrderByTimestampDesc()
+        ControlLog latestLog = controlLogRepository.findFirstByDamIdOrderByTimestampDesc(meta.getId())
                 .orElseGet(() -> {
-                    log.info("No control log found in database. Initializing default log...");
+                    log.info("No control log found in database for dam {}. Initializing default log...", meta.getName());
                     ControlLog defaultLog = ControlLog.builder()
+                            .damId(meta.getId())
                             .timestamp(LocalDateTime.now())
                             .forecastPrecipitationMm(0.0)
                             .predictedInflowM3(0.0)
@@ -78,47 +91,68 @@ public class DamController {
 
     /**
      * POST /api/v1/dam/update-state
-     * Payload: { "currentVolumeM3": 195000000.0, "waterLevelMeters": 21.5 }
-     * Updates reservoir state, fetches forecast rain, runs engine logic, returns decision.
      */
     @PostMapping("/update-state")
     public ResponseEntity<ControlLog> updateReservoirState(@RequestBody UpdateStateRequest request) {
-        log.info("Received manual state update request: Volume={}, Level={}",
-                request.getCurrentVolumeM3(), request.getWaterLevelMeters());
+        return updateReservoirState("erai", request);
+    }
 
-        // Update current reservoir state metadata in DB
+    /**
+     * POST /api/v1/dam/{damId}/update-state
+     * Payload: { "currentVolumeM3": 195000000.0, "waterLevelMeters": 21.5 }
+     * Updates reservoir state, fetches forecast rain, runs engine logic, returns decision.
+     */
+    @PostMapping("/{damId}/update-state")
+    public ResponseEntity<ControlLog> updateReservoirState(@PathVariable String damId, @RequestBody UpdateStateRequest request) {
+        com.SmartDam.Dam_Control_System.entity.DamMetadata meta = com.SmartDam.Dam_Control_System.entity.DamMetadata.get(damId);
+        log.info("Received manual state update request for {}: Volume={}, Level={}",
+                meta.getName(), request.getCurrentVolumeM3(), request.getWaterLevelMeters());
+
         double currentVolume = request.getCurrentVolumeM3();
         double level = request.getWaterLevelMeters();
 
-        // Retrieve or create state record
-        ReservoirState state = reservoirStateRepository.findFirstByOrderByTimestampDesc()
+        // Retrieve or create state record for this dam
+        ReservoirState state = reservoirStateRepository.findFirstByDamIdOrderByTimestampDesc(meta.getId())
                 .orElse(new ReservoirState());
 
+        state.setDamId(meta.getId());
         state.setTimestamp(LocalDateTime.now());
         state.setCurrentVolumeM3(currentVolume);
         state.setWaterLevelMeters(level);
         reservoirStateRepository.save(state);
 
         // Fetch weather forecast rain sum
-        double forecastRainfall = weatherForecastService.fetchThreeDayPrecipitation();
+        double forecastRainfall = weatherForecastService.fetchThreeDayPrecipitation(meta.getLatitude(), meta.getLongitude());
 
         // Run decision engine
-        ControlLog updatedDecision = damControlEngineService.evaluateAndExecuteControlLogic(currentVolume, forecastRainfall);
+        ControlLog updatedDecision = damControlEngineService.evaluateAndExecuteControlLogic(meta.getId(), currentVolume, forecastRainfall);
 
         return ResponseEntity.ok(updatedDecision);
     }
 
     /**
      * GET /api/v1/dam/forecast-eval
-     * Query Parameters: currentVolumeM3, forecastRainfallMm
-     * Triggers on-demand evaluation simulation. Does not write/persist simulation results to DB.
      */
     @GetMapping("/forecast-eval")
     public ResponseEntity<ControlLog> runForecastSimulation(
             @RequestParam double currentVolumeM3,
             @RequestParam double forecastRainfallMm) {
-        log.info("Received simulation request: Volume={}, Rainfall={}", currentVolumeM3, forecastRainfallMm);
-        ControlLog simulatedLog = damControlEngineService.simulateControlLogic(currentVolumeM3, forecastRainfallMm);
+        return runForecastSimulation("erai", currentVolumeM3, forecastRainfallMm);
+    }
+
+    /**
+     * GET /api/v1/dam/{damId}/forecast-eval
+     * Query Parameters: currentVolumeM3, forecastRainfallMm
+     * Triggers on-demand evaluation simulation. Does not write/persist simulation results to DB.
+     */
+    @GetMapping("/{damId}/forecast-eval")
+    public ResponseEntity<ControlLog> runForecastSimulation(
+            @PathVariable String damId,
+            @RequestParam double currentVolumeM3,
+            @RequestParam double forecastRainfallMm) {
+        com.SmartDam.Dam_Control_System.entity.DamMetadata meta = com.SmartDam.Dam_Control_System.entity.DamMetadata.get(damId);
+        log.info("Received simulation request for {}: Volume={}, Rainfall={}", meta.getName(), currentVolumeM3, forecastRainfallMm);
+        ControlLog simulatedLog = damControlEngineService.simulateControlLogic(meta.getId(), currentVolumeM3, forecastRainfallMm);
         return ResponseEntity.ok(simulatedLog);
     }
 

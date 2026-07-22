@@ -9,7 +9,7 @@ services:
       MYSQL_ROOT_PASSWORD: smartdam
       MYSQL_DATABASE: smart_dam_db
     ports:
-      - "3306:3306"          # expose so you can connect with MySQL Workbench too
+      - "3307:3306"          # expose so you can connect with MySQL Workbench too
     volumes:
       - mysql_data:/var/lib/mysql   # persist data across restarts
     healthcheck:

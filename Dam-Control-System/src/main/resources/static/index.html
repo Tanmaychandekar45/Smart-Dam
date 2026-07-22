@@ -159,7 +159,12 @@
     <div class="flex items-center gap-6">
       <div class="flex items-center gap-2 text-primary font-label-sm bg-primary-container/20 px-3 py-1 rounded-full border border-primary/30">
         <span class="material-symbols-outlined text-[18px]">location_on</span>
-        Erai Dam, Chandrapur
+        <select id="dam-selector" class="bg-transparent text-primary border-none outline-none font-label-sm pr-6 py-0 focus:ring-0 cursor-pointer">
+          <option value="erai" class="bg-background text-on-surface">Erai Dam (Chandrapur)</option>
+          <option value="khadakwasla" class="bg-background text-on-surface">Khadakwasla Dam (Pune)</option>
+          <option value="panshet" class="bg-background text-on-surface">Panshet Dam (Pune)</option>
+          <option value="mulshi" class="bg-background text-on-surface">Mulshi Dam (Pune)</option>
+        </select>
       </div>
       <div class="flex items-center gap-3">
         <button id="refresh-btn" class="text-on-surface-variant hover:text-primary transition-colors" title="Synchronize telemetry data">
@@ -974,12 +979,75 @@
   </main>
 
   <script>
-    // Constants
-    const MAX_CAPACITY = 226500000.0;
-    const WARNING_THRESHOLD = 192525000.0;
+    // Predefined registry of available dams
+    const DAMS = {
+      erai: {
+        id: "erai",
+        name: "Erai Dam",
+        region: "Chandrapur",
+        coordinates: "20.1677° N, 79.3048° E",
+        maxCapacity: 226500000.0,
+        warningThreshold: 192525000.0,
+        maxSafeDischarge: 800.0,
+        maxLevel: 23.6,
+        villages: ["Padmapur", "Datala", "Rayatwari"],
+        river: "Erai River Basin, Chandrapur, Maharashtra",
+        catchmentText: "439.33 km²",
+        coeffText: "0.60",
+        warningCapText: "192.52M m³"
+      },
+      khadakwasla: {
+        id: "khadakwasla",
+        name: "Khadakwasla Dam",
+        region: "Pune",
+        coordinates: "18.4316° N, 73.7634° E",
+        maxCapacity: 56000000.0,
+        warningThreshold: 47600000.0,
+        maxSafeDischarge: 500.0,
+        maxLevel: 15.0,
+        villages: ["Nanded City", "Sinhagad Road", "Karve Nagar"],
+        river: "Mutha River Basin, Pune, Maharashtra",
+        catchmentText: "501.00 km²",
+        coeffText: "0.65",
+        warningCapText: "47.60M m³"
+      },
+      panshet: {
+        id: "panshet",
+        name: "Panshet Dam",
+        region: "Pune",
+        coordinates: "18.3759° N, 73.6120° E",
+        maxCapacity: 294000000.0,
+        warningThreshold: 249900000.0,
+        maxSafeDischarge: 1000.0,
+        maxLevel: 35.0,
+        villages: ["Panshet Village", "Kuran", "Khanapur"],
+        river: "Ambi River Basin, Pune, Maharashtra",
+        catchmentText: "120.00 km²",
+        coeffText: "0.70",
+        warningCapText: "249.90M m³"
+      },
+      mulshi: {
+        id: "mulshi",
+        name: "Mulshi Dam",
+        region: "Pune",
+        coordinates: "18.5284° N, 73.5134° E",
+        maxCapacity: 522000000.0,
+        warningThreshold: 443700000.0,
+        maxSafeDischarge: 1500.0,
+        maxLevel: 50.0,
+        villages: ["Mulshi Valley", "Male Village", "Bhare"],
+        river: "Mula River Basin, Pune, Maharashtra",
+        catchmentText: "250.00 km²",
+        coeffText: "0.75",
+        warningCapText: "443.70M m³"
+      }
+    };
+
+    let currentDamId = 'erai';
     const API_BASE = '/api/v1/dam';
 
     // Elements
+    const damSelector = document.getElementById('dam-selector');
     const syncTimestampEl = document.getElementById('sync-timestamp');
     const systemStatusPillEl = document.getElementById('system-status-pill');
     const currentVolumeValEl = document.getElementById('current-volume-val');
@@ -1035,10 +1103,99 @@
     const village3Readiness = document.getElementById('village3-readiness');
     const matrixFlowStatusEl = document.getElementById('matrix-flow-status');
 
+    // Update static HTML components based on selected dam config
+    function updateStaticDamDetails() {
+      const dam = DAMS[currentDamId];
+      
+      // Title & Subtitle updates
+      document.querySelector('h2.text-display-lg').textContent = `${dam.name} Operations Control`;
+      document.querySelector('title').textContent = `HYDRO-OS v4.2 | ${dam.name} Operations Control`;
+      
+      // Subtitle locations
+      document.querySelectorAll('.material-symbols-outlined + span').forEach(el => {
+        if (el.textContent.includes('River Basin') || el.textContent.includes('Erai Dam')) {
+          el.textContent = dam.river;
+        }
+      });
+      
+      // Coordinates displays
+      document.querySelectorAll('.font-mono.text-primary.mt-1.text-xs').forEach(el => {
+        el.textContent = dam.coordinates;
+      });
+      
+      // Update Hydrological Matrix Grid Labels
+      const gridLabels = document.querySelectorAll('#card-telemetry .font-mono div .text-md');
+      if (gridLabels.length >= 4) {
+        gridLabels[0].textContent = dam.catchmentText;
+        gridLabels[1].textContent = dam.coeffText;
+        gridLabels[2].textContent = dam.warningCapText;
+      }
+      
+      // Update max safe limits and metrics texts
+      const safeLimitValEls = document.querySelectorAll('.text-headline-md.font-bold.text-on-surface');
+      safeLimitValEls.forEach(el => {
+        if (el.textContent.includes('800')) {
+          el.innerHTML = `${Math.round(dam.maxSafeDischarge)} <span class="text-[14px] text-on-surface-variant font-normal">m³/s</span>`;
+        }
+      });
+      
+      // Checklist right-hand side params
+      const checklistParams = document.querySelectorAll('.lg\\:col-span-4.glass-card .font-bold');
+      if (checklistParams.length >= 4) {
+        checklistParams[0].textContent = `${dam.maxCapacity.toLocaleString()} m³`;
+        checklistParams[1].textContent = `${dam.warningThreshold.toLocaleString()} m³`;
+        checklistParams[2].textContent = `${Math.round(dam.maxSafeDischarge)} m³/s`;
+        checklistParams[3].textContent = `${parseFloat(dam.coeffText) * 100}%`;
+      }
+
+      // Evacuation protocol details
+      const protocolDetails = document.querySelectorAll('#view-protocols-wrapper .glass-card');
+      if (protocolDetails.length >= 3) {
+        protocolDetails[1].querySelector('p').textContent = `Capacity reaches or exceeds 85% (${(dam.warningThreshold/1e6).toFixed(1)}M m³). Early proactive release initiated to prevent storage overflow. G1 & G2 opened proportionally. Channel flows monitored hourly.`;
+        protocolDetails[2].querySelector('p').textContent = `Precipitation results in projected volume exceeding warning limits and discharge exceeds downstream safe capacity (${Math.round(dam.maxSafeDischarge)} m³/s). Gates G3 & G4 unlocked. Sirens triggered in ${dam.villages[0]} and ${dam.villages[1]}.`;
+      }
+      
+      // Update downstream village names in the table
+      const villageNameCells = document.querySelectorAll('#card-risk-matrix tbody tr td:first-child');
+      if (villageNameCells.length >= 3) {
+        villageNameCells[0].textContent = dam.villages[0];
+        villageNameCells[1].textContent = dam.villages[1];
+        villageNameCells[2].textContent = dam.villages[2];
+      }
+      
+      // Adjust sliders range & initial values
+      volumeSlider.min = dam.maxCapacity * 0.4;
+      volumeSlider.max = dam.maxCapacity;
+      volumeSlider.step = dam.maxCapacity / 200;
+      
+      levelSlider.min = 0;
+      levelSlider.max = dam.maxLevel;
+      levelSlider.step = dam.maxLevel / 200;
+
+      // Adjust simulation sliders range
+      if (simVolSlider) {
+        simVolSlider.min = dam.maxCapacity * 0.4;
+        simVolSlider.max = dam.maxCapacity;
+        simVolSlider.step = dam.maxCapacity / 200;
+        simVolSlider.value = dam.maxCapacity * 0.8;
+        if (simVolVal) simVolVal.textContent = `${((dam.maxCapacity * 0.8) / 1000000).toFixed(1)}M m³`;
+      }
+      
+      // Update labels in other view cards
+      const docHeader = document.querySelector('#page-forecasts h2');
+      if (docHeader) docHeader.textContent = `${dam.name} Forecast Matrix`;
+      
+      const docHeaderSub = document.querySelector('#page-forecasts p');
+      if (docHeaderSub) docHeaderSub.textContent = `Meteorological & Hydrological Predictive Modeling for ${dam.name} • Last Update: 14:00 IST`;
+
+      const satHeader = document.querySelector('#page-forecasts .lg\\:col-span-3 h3');
+      if (satHeader) satHeader.innerHTML = `<span class="material-symbols-outlined text-[20px] text-secondary">satellite_alt</span> ${dam.region} Satellite`;
+    }
+
     // Handle Telemetry sync
     async function loadDamStatus() {
       try {
-        const res = await fetch(`${API_BASE}/status`);
+        const res = await fetch(`${API_BASE}/${currentDamId}/status`);
         if (!res.ok) throw new Error('API server unavailable');
         const data = await res.json();
         
@@ -1050,6 +1207,7 @@
     }
 
     function updateUI(state, logData) {
+      const dam = DAMS[currentDamId];
       // Sync times
       const now = new Date();
       syncTimestampEl.textContent = now.toLocaleTimeString();
@@ -1067,10 +1225,10 @@
       levelSliderVal.textContent = `${state.waterLevelMeters.toFixed(1)} m`;
 
       // Capacity bar
-      const capPct = Math.round((currentVolume / MAX_CAPACITY) * 100);
+      const capPct = Math.round((currentVolume / dam.maxCapacity) * 100);
       storageProgressEl.style.width = `${capPct}%`;
 
-      if (currentVolume >= WARNING_THRESHOLD) {
+      if (currentVolume >= dam.warningThreshold) {
         storageProgressEl.className = "bg-tertiary h-full transition-all duration-500 status-pulse-warning";
         storagePercentageTextEl.textContent = `${capPct}% Capacity - Amber Warning`;
         storagePercentageTextEl.className = "text-label-sm text-tertiary font-semibold";
@@ -1123,7 +1281,6 @@
       }
 
       // Sluice Gate configuration
-      // We map gateOpenPercentage to height. G1 & G2 scale first, then G3 & G4 open in emergency.
       const gateOpenPct = state.gateOpenPercentage;
       
       if (logData.floodAlertTriggered) {
@@ -1183,11 +1340,9 @@
       }
 
       // Downstream Villages flow mapping based on current outflow
-      // Map recommendedOutflow (0 to 800) to river flow capacity levels
-      // Village travel times: Padmapur 2.5h, Datala 4.2h, Rayatwari 6.8h
-      const outflowPct = recommendedOutflow / 800.0;
+      const outflowPct = recommendedOutflow / dam.maxSafeDischarge;
       
-      const v1Cap = Math.round(15 + outflowPct * 80); // Padmapur gets the brunt quickly
+      const v1Cap = Math.round(15 + outflowPct * 80); 
       const v2Cap = Math.round(10 + outflowPct * 65);
       const v3Cap = Math.round(5 + outflowPct * 45);
 
@@ -1229,22 +1384,29 @@
       }
     }
 
+    // Selector Change Listener
+    damSelector.addEventListener('change', () => {
+      currentDamId = damSelector.value;
+      updateStaticDamDetails();
+      loadDamStatus();
+    });
+
     // Sliders event listeners
     volumeSlider.addEventListener('input', () => {
+      const dam = DAMS[currentDamId];
       const vol = parseFloat(volumeSlider.value);
       volumeSliderVal.textContent = `${(vol / 1000000).toFixed(1)}M m³`;
-      // Linearly approximate matching water level: max cap (226.5M) -> 23.6m
-      const approxLevel = (vol / MAX_CAPACITY) * 23.6;
+      const approxLevel = (vol / dam.maxCapacity) * dam.maxLevel;
       levelSlider.value = approxLevel.toFixed(1);
       levelSliderVal.textContent = `${approxLevel.toFixed(1)} m`;
     });
 
     levelSlider.addEventListener('input', () => {
+      const dam = DAMS[currentDamId];
       const lvl = parseFloat(levelSlider.value);
       levelSliderVal.textContent = `${lvl.toFixed(1)} m`;
-      // Inverse linear volume approximation
-      const approxVol = (lvl / 23.6) * MAX_CAPACITY;
-      volumeSlider.value = Math.min(MAX_CAPACITY, Math.round(approxVol));
+      const approxVol = (lvl / dam.maxLevel) * dam.maxCapacity;
+      volumeSlider.value = Math.min(dam.maxCapacity, Math.round(approxVol));
       volumeSliderVal.textContent = `${(volumeSlider.value / 1000000).toFixed(1)}M m³`;
     });
 
@@ -1266,7 +1428,7 @@
           waterLevelMeters: parseFloat(levelSlider.value)
         };
 
-        const res = await fetch(`${API_BASE}/update-state`, {
+        const res = await fetch(`${API_BASE}/${currentDamId}/update-state`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -1274,7 +1436,6 @@
 
         if (!res.ok) throw new Error('Failed to update state');
         
-        // Reload telemetry to sync
         await loadDamStatus();
         simulationStatusEl.textContent = "Real telemetry state updated successfully.";
         simulationStatusEl.className = "text-xs text-secondary font-mono";
@@ -1295,12 +1456,10 @@
         const rainVal = parseFloat(simRainSlider.value);
         
         const queryParams = `?currentVolumeM3=${volumeVal}&forecastRainfallMm=${rainVal}`;
-        const res = await fetch(`${API_BASE}/forecast-eval${queryParams}`);
+        const res = await fetch(`${API_BASE}/${currentDamId}/forecast-eval${queryParams}`);
         if (!res.ok) throw new Error('Simulation calculation failed');
         
         const decisionLog = await res.json();
-        
-        // Show simulation result in the decision card
         decisionLogText.textContent = decisionLog.statusMessage;
         
         if (decisionLog.floodAlertTriggered) {
@@ -1340,19 +1499,14 @@
     const pageForecasts = document.getElementById('page-forecasts');
 
     function switchTab(activeBtn, activePage) {
-      // Remove active class from all buttons
       [navTelemetry, navHydraulics, navForecasts].forEach(btn => {
         btn.className = "text-on-surface-variant hover:bg-surface-variant/50 flex items-center gap-3 px-4 py-3 rounded-lg transition-all";
       });
-      // Add active class to selected button
       activeBtn.className = "sidebar-active flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200";
 
-      // Hide all pages
       [pageTelemetry, pageHydraulics, pageForecasts].forEach(page => page.classList.add('hidden'));
-      // Show selected page
       activePage.classList.remove('hidden');
 
-      // Relocate decision log card dynamically — only if a target container exists
       if (activePage === pageTelemetry) {
         const telemetrySlot = pageTelemetry.querySelector('.lg\\:col-span-4');
         if (telemetrySlot) telemetrySlot.appendChild(decisionLogCard);
@@ -1390,18 +1544,14 @@
     const viewProtocolsWrapper = document.getElementById('view-protocols-wrapper');
 
     function switchTopTab(activeBtn, activeWrapper) {
-      // Manage button styles
       [topDashboard, topAnalytics, topProtocols].forEach(btn => {
         btn.className = "text-on-surface-variant font-label-md hover:text-primary transition-colors pb-1";
       });
       activeBtn.className = "text-primary border-b-2 border-primary pb-1 font-label-md";
 
-      // Hide all main page wrappers
       [viewDashboardWrapper, viewAnalyticsWrapper, viewProtocolsWrapper].forEach(wrapper => wrapper.classList.add('hidden'));
-      // Show active wrapper
       activeWrapper.classList.remove('hidden');
 
-      // Adjust main canvas layout depending on sidebar presence
       if (activeWrapper === viewDashboardWrapper) {
         sidebarContainer.classList.remove('md:hidden');
         sidebarContainer.classList.add('md:flex');
@@ -1433,43 +1583,38 @@
     // Test Siren Handler
     const testSirenBtn = document.getElementById('btn-test-siren');
     testSirenBtn.addEventListener('click', () => {
-      // Create a nice floating notification banner
+      const dam = DAMS[currentDamId];
       const banner = document.createElement('div');
       banner.className = "fixed bottom-5 right-5 z-50 bg-error text-on-error border border-error-container/30 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce";
       banner.innerHTML = `
         <span class="material-symbols-outlined text-[24px] animate-ping">warning</span>
         <div>
           <h4 class="font-bold font-mono text-sm uppercase">Siren Test Transmission Active</h4>
-          <p class="text-xs opacity-90 mt-0.5">Broadcasting signal to downstream villages (Rayatwari, Padmapur). Audio audit: nominal.</p>
+          <p class="text-xs opacity-90 mt-0.5">Broadcasting signal to downstream villages (${dam.villages.join(', ')}). Audio audit: nominal.</p>
         </div>
       `;
       document.body.appendChild(banner);
       
-      // Play a subtle synth audio alarm sound using Web Audio API!
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        // Siren sound: fluctuating frequency
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
-        // Fluctuating frequency over 1.5 seconds
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
         osc.frequency.linearRampToValueAtTime(880, audioCtx.currentTime + 0.5);
         osc.frequency.linearRampToValueAtTime(440, audioCtx.currentTime + 1.0);
         osc.frequency.linearRampToValueAtTime(880, audioCtx.currentTime + 1.5);
         
-        gain.gain.setValueAtTime(0.05, audioCtx.currentTime); // Low volume
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.8);
         
         osc.start();
         osc.stop(audioCtx.currentTime + 1.8);
       } catch (e) {
-        console.warn("Web Audio API not supported or blocked by user gesture:", e);
+        console.warn("Web Audio API not supported:", e);
       }
 
       setTimeout(() => {
@@ -1483,9 +1628,11 @@
 
     // Initial load
     window.addEventListener('DOMContentLoaded', () => {
+      updateStaticDamDetails();
       switchTab(navTelemetry, pageTelemetry);
       loadDamStatus();
     });
+
     // Generate PDF Report
     const pdfBtn = document.getElementById('btn-generate-pdf');
     if (pdfBtn) {
@@ -1493,8 +1640,8 @@
         pdfBtn.disabled = true;
         pdfBtn.innerHTML = `<span class="material-symbols-outlined text-[18px]">hourglass_top</span> Generating...`;
         try {
-          // Fetch live data
-          const res = await fetch(`${API_BASE}/status`);
+          const dam = DAMS[currentDamId];
+          const res = await fetch(`${API_BASE}/${currentDamId}/status`);
           if (!res.ok) throw new Error('Could not fetch live data');
           const data = await res.json();
           const s = data.state;
@@ -1505,7 +1652,7 @@
 
           const W = doc.internal.pageSize.getWidth();
           const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-          const capPct = ((s.currentVolumeM3 / 226500000) * 100).toFixed(1);
+          const capPct = ((s.currentVolumeM3 / dam.maxCapacity) * 100).toFixed(1);
 
           // ── Header Band ──────────────────────────────────────────────────
           doc.setFillColor(11, 19, 38);
@@ -1513,10 +1660,10 @@
           doc.setTextColor(79, 219, 200);
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(16);
-          doc.text('HYDRO-OS v4.2  |  ERAI DAM OPERATIONS REPORT', 14, 13);
+          doc.text(`HYDRO-OS v4.2  |  ${dam.name.toUpperCase()} REPORT`, 14, 13);
           doc.setFontSize(8);
           doc.setTextColor(190, 200, 210);
-          doc.text(`Erai River Basin, Chandrapur, Maharashtra  •  Generated: ${now} IST`, 14, 20);
+          doc.text(`${dam.river}  •  Generated: ${now} IST`, 14, 20);
           doc.setDrawColor(79, 219, 200);
           doc.setLineWidth(0.5);
           doc.line(14, 26, W - 14, 26);
@@ -1533,7 +1680,7 @@
           y += 8;
 
           const stateRows = [
-            ['Current Volume', `${(s.currentVolumeM3 / 1e6).toFixed(2)} M m³`, 'Max Capacity', '226.50 M m³'],
+            ['Current Volume', `${(s.currentVolumeM3 / 1e6).toFixed(2)} M m³`, 'Max Capacity', `${(dam.maxCapacity / 1e6).toFixed(2)} M m³`],
             ['Water Level', `${s.waterLevelMeters.toFixed(2)} m`, 'Storage Utilisation', `${capPct}%`],
             ['Gate Open %', `${s.gateOpenPercentage.toFixed(1)}%`, 'Current Outflow', `${s.currentOutflowM3s.toFixed(2)} m³/s`],
           ];
@@ -1612,8 +1759,8 @@
           y += 8;
 
           const hydroRows = [
-            ['Catchment Area', '439.33 km²', 'Runoff Coefficient', '0.60'],
-            ['Warning Threshold (85%)', '192.52 M m³', 'Max Safe Discharge', '800 m³/s'],
+            ['Catchment Area', dam.catchmentText, 'Runoff Coefficient', dam.coeffText],
+            ['Warning Threshold (85%)', dam.warningCapText, 'Max Safe Discharge', `${Math.round(dam.maxSafeDischarge)} m³/s`],
             ['Saturation Index', '72.4%', 'Catchment Runoff Rate', '1.2 m/hr'],
             ['Soil Permeability', 'High', 'Precipitation Density', '84%'],
           ];
@@ -1643,11 +1790,11 @@
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(7);
           doc.setTextColor(140, 150, 165);
-          doc.text('HYDRO-OS v4.2  |  Erai Dam Control System  |  Confidential — For Authorized Personnel Only', 14, footerY);
+          doc.text(`HYDRO-OS v4.2  |  ${dam.name} Control System  |  Confidential — For Authorized Personnel Only`, 14, footerY);
           doc.text(`Page 1 of 1`, W - 28, footerY);
 
           // ── Save ─────────────────────────────────────────────────────────
-          const filename = `Erai_Dam_Report_${new Date().toISOString().slice(0,10)}.pdf`;
+          const filename = `${dam.name.replace(/\s+/g, '_')}_Report_${new Date().toISOString().slice(0,10)}.pdf`;
           doc.save(filename);
         } catch (err) {
           alert('PDF generation failed: ' + err.message);

@@ -8,4 +8,5 @@ import java.util.Optional;
 @Repository
 public interface ControlLogRepository extends JpaRepository<ControlLog, Long> {
     Optional<ControlLog> findFirstByOrderByTimestampDesc();
+    Optional<ControlLog> findFirstByDamIdOrderByTimestampDesc(String damId);
 }

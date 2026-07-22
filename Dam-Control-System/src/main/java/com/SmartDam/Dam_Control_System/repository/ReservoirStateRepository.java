@@ -8,4 +8,5 @@ import java.util.Optional;
 @Repository
 public interface ReservoirStateRepository extends JpaRepository<ReservoirState, Long> {
     Optional<ReservoirState> findFirstByOrderByTimestampDesc();
+    Optional<ReservoirState> findFirstByDamIdOrderByTimestampDesc(String damId);
 }

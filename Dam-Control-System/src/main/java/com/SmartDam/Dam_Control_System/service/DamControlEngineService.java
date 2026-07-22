@@ -35,13 +35,14 @@ public class DamControlEngineService {
      * Core business logic engine evaluating runoff predictions, safe discharges, and updating dam states.
      */
     @Transactional
-    public ControlLog evaluateAndExecuteControlLogic(double currentVolumeM3, double forecastRainfallMm) {
-        log.info("Running Control Engine Evaluation - Current Volume: {} m3, Forecast Rain: {} mm",
-                currentVolumeM3, forecastRainfallMm);
+    public ControlLog evaluateAndExecuteControlLogic(String damId, double currentVolumeM3, double forecastRainfallMm) {
+        com.SmartDam.Dam_Control_System.entity.DamMetadata meta = com.SmartDam.Dam_Control_System.entity.DamMetadata.get(damId);
+        log.info("Running Control Engine Evaluation for Dam: {} ({}) - Current Volume: {} m3, Forecast Rain: {} mm",
+                meta.getName(), meta.getId(), currentVolumeM3, forecastRainfallMm);
 
         // Runoff Calculation
         // Projected Inflow (m³) = (forecastRainfallMm / 1000.0) * Catchment Area * Run-off Coefficient
-        double projectedInflowM3 = (forecastRainfallMm / 1000.0) * CATCHMENT_AREA_M2 * RUNOFF_COEFFICIENT;
+        double projectedInflowM3 = (forecastRainfallMm / 1000.0) * meta.getCatchmentAreaM2() * meta.getRunoffCoefficient();
 
         // Mass Balance
         double projectedVolumeM3 = currentVolumeM3 + projectedInflowM3;
@@ -51,18 +52,18 @@ public class DamControlEngineService {
         String statusMessage;
 
         // Decision Logic
-        if (projectedVolumeM3 > WARNING_THRESHOLD_M3) {
-            double excessVolume = projectedVolumeM3 - WARNING_THRESHOLD_M3;
+        if (projectedVolumeM3 > meta.getWarningThresholdM3()) {
+            double excessVolume = projectedVolumeM3 - meta.getWarningThresholdM3();
             // Proactive discharge needed over 24 hours: excessVolume / (24 * 3600)
             double requiredOutflowM3s = excessVolume / (24.0 * 3600.0);
 
-            if (requiredOutflowM3s > MAX_SAFE_DISCHARGE_M3S) {
-                recommendedOutflowM3s = MAX_SAFE_DISCHARGE_M3S;
+            if (requiredOutflowM3s > meta.getMaxSafeDischargeM3s()) {
+                recommendedOutflowM3s = meta.getMaxSafeDischargeM3s();
                 floodAlertTriggered = true;
                 statusMessage = String.format("EMERGENCY: Projected volume (%.2fM m³) exceeds warning threshold. " +
-                                "Required release rate (%.2f m³/s) exceeds downstream safe channel capacity (800.00 m³/s). " +
-                                "Flood alert triggered for Chandrapur region.",
-                        projectedVolumeM3 / 1e6, requiredOutflowM3s);
+                                "Required release rate (%.2f m³/s) exceeds downstream safe channel capacity (%.2f m³/s). " +
+                                "Flood alert triggered for %s region.",
+                        projectedVolumeM3 / 1e6, requiredOutflowM3s, meta.getMaxSafeDischargeM3s(), meta.getRegion());
             } else {
                 recommendedOutflowM3s = requiredOutflowM3s;
                 floodAlertTriggered = false;
@@ -80,6 +81,7 @@ public class DamControlEngineService {
 
         // Save ControlLog decision
         ControlLog decisionLog = ControlLog.builder()
+                .damId(meta.getId())
                 .timestamp(LocalDateTime.now())
                 .forecastPrecipitationMm(forecastRainfallMm)
                 .predictedInflowM3(projectedInflowM3)
@@ -89,30 +91,31 @@ public class DamControlEngineService {
                 .build();
 
         ControlLog savedLog = controlLogRepository.save(decisionLog);
-        log.info("Persisted Decision Control Log. ID: {}, Alert: {}, Recommended Release: {} m3/s",
-                savedLog.getId(), savedLog.isFloodAlertTriggered(), savedLog.getRecommendedOutflowM3s());
+        log.info("Persisted Decision Control Log. ID: {}, Dam: {}, Alert: {}, Recommended Release: {} m3/s",
+                savedLog.getId(), savedLog.getDamId(), savedLog.isFloodAlertTriggered(), savedLog.getRecommendedOutflowM3s());
 
         // Update the ReservoirState (or create one if updating via background/API scheduler flow)
         // Set gate open percentage proportional to discharge (Q_rec / Q_safe * 100%)
-        double gateOpenPercentage = (recommendedOutflowM3s / MAX_SAFE_DISCHARGE_M3S) * 100.0;
+        double gateOpenPercentage = (recommendedOutflowM3s / meta.getMaxSafeDischargeM3s()) * 100.0;
         final double finalOutflow = recommendedOutflowM3s;
         
-        // Find latest reservoir state to update or insert a new one
-        reservoirStateRepository.findFirstByOrderByTimestampDesc()
+        // Find latest reservoir state for this dam to update or insert a new one
+        reservoirStateRepository.findFirstByDamIdOrderByTimestampDesc(meta.getId())
                 .ifPresentOrElse(
                         state -> {
                             state.setTimestamp(LocalDateTime.now());
                             state.setCurrentVolumeM3(currentVolumeM3);
-                            // Estimate water level linearly for demonstration: max capacity corresponds to e.g. 23.6m, let's keep it proportionate
-                            double estimatedLevel = (currentVolumeM3 / MAX_CAPACITY_M3) * 23.6; 
+                            // Estimate water level linearly for demonstration: max capacity corresponds to max level
+                            double estimatedLevel = (currentVolumeM3 / meta.getMaxCapacityM3()) * meta.getMaxWaterLevelMeters(); 
                             state.setWaterLevelMeters(Math.round(estimatedLevel * 100.0) / 100.0);
                             state.setCurrentOutflowM3s(finalOutflow);
                             state.setGateOpenPercentage(Math.round(gateOpenPercentage * 100.0) / 100.0);
                             reservoirStateRepository.save(state);
                         },
                         () -> {
-                            double estimatedLevel = (currentVolumeM3 / MAX_CAPACITY_M3) * 23.6;
+                            double estimatedLevel = (currentVolumeM3 / meta.getMaxCapacityM3()) * meta.getMaxWaterLevelMeters();
                             ReservoirState newState = ReservoirState.builder()
+                                    .damId(meta.getId())
                                     .timestamp(LocalDateTime.now())
                                     .currentVolumeM3(currentVolumeM3)
                                     .waterLevelMeters(Math.round(estimatedLevel * 100.0) / 100.0)
@@ -126,28 +129,34 @@ public class DamControlEngineService {
         return savedLog;
     }
 
+    @Transactional
+    public ControlLog evaluateAndExecuteControlLogic(double currentVolumeM3, double forecastRainfallMm) {
+        return evaluateAndExecuteControlLogic("erai", currentVolumeM3, forecastRainfallMm);
+    }
+
     /**
      * Executes scenario simulation on-demand without database side effects.
      */
-    public ControlLog simulateControlLogic(double currentVolumeM3, double forecastRainfallMm) {
-        double projectedInflowM3 = (forecastRainfallMm / 1000.0) * CATCHMENT_AREA_M2 * RUNOFF_COEFFICIENT;
+    public ControlLog simulateControlLogic(String damId, double currentVolumeM3, double forecastRainfallMm) {
+        com.SmartDam.Dam_Control_System.entity.DamMetadata meta = com.SmartDam.Dam_Control_System.entity.DamMetadata.get(damId);
+        double projectedInflowM3 = (forecastRainfallMm / 1000.0) * meta.getCatchmentAreaM2() * meta.getRunoffCoefficient();
         double projectedVolumeM3 = currentVolumeM3 + projectedInflowM3;
 
         double recommendedOutflowM3s;
         boolean floodAlertTriggered;
         String statusMessage;
 
-        if (projectedVolumeM3 > WARNING_THRESHOLD_M3) {
-            double excessVolume = projectedVolumeM3 - WARNING_THRESHOLD_M3;
+        if (projectedVolumeM3 > meta.getWarningThresholdM3()) {
+            double excessVolume = projectedVolumeM3 - meta.getWarningThresholdM3();
             double requiredOutflowM3s = excessVolume / (24.0 * 3600.0);
 
-            if (requiredOutflowM3s > MAX_SAFE_DISCHARGE_M3S) {
-                recommendedOutflowM3s = MAX_SAFE_DISCHARGE_M3S;
+            if (requiredOutflowM3s > meta.getMaxSafeDischargeM3s()) {
+                recommendedOutflowM3s = meta.getMaxSafeDischargeM3s();
                 floodAlertTriggered = true;
                 statusMessage = String.format("[SIMULATION] EMERGENCY: Projected volume (%.2fM m³) exceeds warning threshold. " +
-                                "Required release rate (%.2f m³/s) exceeds downstream safe channel capacity (800.00 m³/s). " +
-                                "Flood alert triggered for Chandrapur region.",
-                        projectedVolumeM3 / 1e6, requiredOutflowM3s);
+                                "Required release rate (%.2f m³/s) exceeds downstream safe channel capacity (%.2f m³/s). " +
+                                "Flood alert triggered for %s region.",
+                        projectedVolumeM3 / 1e6, requiredOutflowM3s, meta.getMaxSafeDischargeM3s(), meta.getRegion());
             } else {
                 recommendedOutflowM3s = requiredOutflowM3s;
                 floodAlertTriggered = false;
@@ -164,6 +173,7 @@ public class DamControlEngineService {
         }
 
         return ControlLog.builder()
+                .damId(meta.getId())
                 .timestamp(LocalDateTime.now())
                 .forecastPrecipitationMm(forecastRainfallMm)
                 .predictedInflowM3(projectedInflowM3)
@@ -171,5 +181,9 @@ public class DamControlEngineService {
                 .floodAlertTriggered(floodAlertTriggered)
                 .statusMessage(statusMessage)
                 .build();
+    }
+
+    public ControlLog simulateControlLogic(double currentVolumeM3, double forecastRainfallMm) {
+        return simulateControlLogic("erai", currentVolumeM3, forecastRainfallMm);
     }
 }

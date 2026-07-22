@@ -20,18 +20,17 @@ public class WeatherForecastService {
     }
 
     /**
-     * Fetches 3-day precipitation forecast for Erai Dam and sums the daily precipitation values.
-     * Coordinate targets: Lat 20.1677, Lon 79.3048.
+     * Fetches 3-day precipitation forecast for dynamic coordinates.
      *
      * @return Sum of forecast precipitation in millimeters (mm) over the next 3 days.
      */
-    public double fetchThreeDayPrecipitation() {
+    public double fetchThreeDayPrecipitation(double latitude, double longitude) {
         try {
-            log.info("Fetching 3-day weather forecast from Open-Meteo API...");
+            log.info("Fetching 3-day weather forecast from Open-Meteo API for coordinates: Lat {}, Lon {}...", latitude, longitude);
             JsonNode response = restClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .queryParam("latitude", 20.1677)
-                            .queryParam("longitude", 79.3048)
+                            .queryParam("latitude", latitude)
+                            .queryParam("longitude", longitude)
                             .queryParam("daily", "precipitation_sum")
                             .queryParam("forecast_days", 3)
                             .queryParam("timezone", "auto")
@@ -59,5 +58,9 @@ public class WeatherForecastService {
             log.error("Failed to retrieve weather forecast from Open-Meteo: {}. Defaulting to 0.0 mm", e.getMessage(), e);
             return 0.0;
         }
+    }
+
+    public double fetchThreeDayPrecipitation() {
+        return fetchThreeDayPrecipitation(20.1677, 79.3048);
     }
 }

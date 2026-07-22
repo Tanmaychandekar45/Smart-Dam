@@ -15,6 +15,7 @@ public class ReservoirState {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String damId;
     private LocalDateTime timestamp;
     private double currentVolumeM3;
     private double waterLevelMeters;
@@ -23,8 +24,9 @@ public class ReservoirState {
 
     public ReservoirState() {}
 
-    public ReservoirState(Long id, LocalDateTime timestamp, double currentVolumeM3, double waterLevelMeters, double currentOutflowM3s, double gateOpenPercentage) {
+    public ReservoirState(Long id, String damId, LocalDateTime timestamp, double currentVolumeM3, double waterLevelMeters, double currentOutflowM3s, double gateOpenPercentage) {
         this.id = id;
+        this.damId = damId;
         this.timestamp = timestamp;
         this.currentVolumeM3 = currentVolumeM3;
         this.waterLevelMeters = waterLevelMeters;
@@ -34,6 +36,9 @@ public class ReservoirState {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getDamId() { return damId; }
+    public void setDamId(String damId) { this.damId = damId; }
 
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
@@ -56,6 +61,7 @@ public class ReservoirState {
 
     public static class ReservoirStateBuilder {
         private Long id;
+        private String damId;
         private LocalDateTime timestamp;
         private double currentVolumeM3;
         private double waterLevelMeters;
@@ -63,6 +69,7 @@ public class ReservoirState {
         private double gateOpenPercentage;
 
         public ReservoirStateBuilder id(Long id) { this.id = id; return this; }
+        public ReservoirStateBuilder damId(String damId) { this.damId = damId; return this; }
         public ReservoirStateBuilder timestamp(LocalDateTime timestamp) { this.timestamp = timestamp; return this; }
         public ReservoirStateBuilder currentVolumeM3(double currentVolumeM3) { this.currentVolumeM3 = currentVolumeM3; return this; }
         public ReservoirStateBuilder waterLevelMeters(double waterLevelMeters) { this.waterLevelMeters = waterLevelMeters; return this; }
@@ -70,7 +77,7 @@ public class ReservoirState {
         public ReservoirStateBuilder gateOpenPercentage(double gateOpenPercentage) { this.gateOpenPercentage = gateOpenPercentage; return this; }
 
         public ReservoirState build() {
-            return new ReservoirState(id, timestamp, currentVolumeM3, waterLevelMeters, currentOutflowM3s, gateOpenPercentage);
+            return new ReservoirState(id, damId, timestamp, currentVolumeM3, waterLevelMeters, currentOutflowM3s, gateOpenPercentage);
         }
     }
 }

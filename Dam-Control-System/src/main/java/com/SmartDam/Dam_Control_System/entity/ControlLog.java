@@ -16,6 +16,7 @@ public class ControlLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String damId;
     private LocalDateTime timestamp;
     private double forecastPrecipitationMm;
     private double predictedInflowM3;
@@ -27,8 +28,9 @@ public class ControlLog {
 
     public ControlLog() {}
 
-    public ControlLog(Long id, LocalDateTime timestamp, double forecastPrecipitationMm, double predictedInflowM3, double recommendedOutflowM3s, boolean floodAlertTriggered, String statusMessage) {
+    public ControlLog(Long id, String damId, LocalDateTime timestamp, double forecastPrecipitationMm, double predictedInflowM3, double recommendedOutflowM3s, boolean floodAlertTriggered, String statusMessage) {
         this.id = id;
+        this.damId = damId;
         this.timestamp = timestamp;
         this.forecastPrecipitationMm = forecastPrecipitationMm;
         this.predictedInflowM3 = predictedInflowM3;
@@ -39,6 +41,9 @@ public class ControlLog {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getDamId() { return damId; }
+    public void setDamId(String damId) { this.damId = damId; }
 
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
@@ -64,6 +69,7 @@ public class ControlLog {
 
     public static class ControlLogBuilder {
         private Long id;
+        private String damId;
         private LocalDateTime timestamp;
         private double forecastPrecipitationMm;
         private double predictedInflowM3;
@@ -72,6 +78,7 @@ public class ControlLog {
         private String statusMessage;
 
         public ControlLogBuilder id(Long id) { this.id = id; return this; }
+        public ControlLogBuilder damId(String damId) { this.damId = damId; return this; }
         public ControlLogBuilder timestamp(LocalDateTime timestamp) { this.timestamp = timestamp; return this; }
         public ControlLogBuilder forecastPrecipitationMm(double forecastPrecipitationMm) { this.forecastPrecipitationMm = forecastPrecipitationMm; return this; }
         public ControlLogBuilder predictedInflowM3(double predictedInflowM3) { this.predictedInflowM3 = predictedInflowM3; return this; }
@@ -80,7 +87,7 @@ public class ControlLog {
         public ControlLogBuilder statusMessage(String statusMessage) { this.statusMessage = statusMessage; return this; }
 
         public ControlLog build() {
-            return new ControlLog(id, timestamp, forecastPrecipitationMm, predictedInflowM3, recommendedOutflowM3s, floodAlertTriggered, statusMessage);
+            return new ControlLog(id, damId, timestamp, forecastPrecipitationMm, predictedInflowM3, recommendedOutflowM3s, floodAlertTriggered, statusMessage);
         }
     }
 }
