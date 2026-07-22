@@ -797,30 +797,30 @@
     <div id="view-analytics-wrapper" class="hidden flex flex-col gap-gutter">
       <!-- Title -->
       <div class="mb-8">
-        <h2 class="text-display-lg text-on-surface font-bold">System Analytics & Historical Trends</h2>
-        <p class="text-label-md text-on-surface-variant mt-1">Detailed hydrological analysis and efficiency parameters for Erai Dam basin.</p>
+        <h2 class="text-display-lg text-on-surface font-bold" id="analytics-title">System Analytics & Historical Trends</h2>
+        <p class="text-label-md text-on-surface-variant mt-1" id="analytics-subtitle">Detailed hydrological analysis and efficiency parameters for Erai Dam basin.</p>
       </div>
 
       <!-- Analytics Grid -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-8">
         <div class="glass-card p-4 rounded-xl">
           <div class="text-xs text-on-surface-variant font-label-md uppercase mb-2">Peak Storage Inflow</div>
-          <div class="text-3xl font-bold text-secondary">7,450 m³/s</div>
-          <div class="text-xs text-on-surface-variant mt-1 font-mono">Recorded: Aug 2024 Monsoon</div>
+          <div class="text-3xl font-bold text-secondary" id="analytics-peak-inflow">7,450 m³/s</div>
+          <div class="text-xs text-on-surface-variant mt-1 font-mono" id="analytics-peak-inflow-date">Recorded: Aug 2024 Monsoon</div>
         </div>
         <div class="glass-card p-4 rounded-xl">
           <div class="text-xs text-on-surface-variant font-label-md uppercase mb-2">Basin Runoff Efficiency</div>
-          <div class="text-3xl font-bold text-primary">60.0%</div>
+          <div class="text-3xl font-bold text-primary" id="analytics-runoff-efficiency">60.0%</div>
           <div class="text-xs text-on-surface-variant mt-1 font-mono">Calibrated coefficient</div>
         </div>
         <div class="glass-card p-4 rounded-xl">
           <div class="text-xs text-on-surface-variant font-label-md uppercase mb-2">Average Precipitation</div>
-          <div class="text-3xl font-bold text-secondary">48.5 mm</div>
+          <div class="text-3xl font-bold text-secondary" id="analytics-avg-precipitation">48.5 mm</div>
           <div class="text-xs text-on-surface-variant mt-1 font-mono">Active seasonal baseline</div>
         </div>
         <div class="glass-card p-4 rounded-xl">
           <div class="text-xs text-on-surface-variant font-label-md uppercase mb-2">Sluice System Uptime</div>
-          <div class="text-3xl font-bold text-primary">99.98%</div>
+          <div class="text-3xl font-bold text-primary" id="analytics-uptime">99.98%</div>
           <div class="text-xs text-on-surface-variant mt-1 font-mono">Diagnostics nominal</div>
         </div>
       </div>
@@ -994,7 +994,11 @@
         river: "Erai River Basin, Chandrapur, Maharashtra",
         catchmentText: "439.33 km²",
         coeffText: "0.60",
-        warningCapText: "192.52M m³"
+        warningCapText: "192.52M m³",
+        peakInflow: "7,450 m³/s",
+        peakInflowDate: "Recorded: Aug 2024 Monsoon",
+        avgPrecip: "48.5 mm",
+        uptime: "99.98%"
       },
       khadakwasla: {
         id: "khadakwasla",
@@ -1009,7 +1013,11 @@
         river: "Mutha River Basin, Pune, Maharashtra",
         catchmentText: "501.00 km²",
         coeffText: "0.65",
-        warningCapText: "47.60M m³"
+        warningCapText: "47.60M m³",
+        peakInflow: "4,120 m³/s",
+        peakInflowDate: "Recorded: Jul 2023 Monsoon",
+        avgPrecip: "62.4 mm",
+        uptime: "99.95%"
       },
       panshet: {
         id: "panshet",
@@ -1024,7 +1032,11 @@
         river: "Ambi River Basin, Pune, Maharashtra",
         catchmentText: "120.00 km²",
         coeffText: "0.70",
-        warningCapText: "249.90M m³"
+        warningCapText: "249.90M m³",
+        peakInflow: "9,850 m³/s",
+        peakInflowDate: "Recorded: Aug 2019 Monsoon",
+        avgPrecip: "78.2 mm",
+        uptime: "99.91%"
       },
       mulshi: {
         id: "mulshi",
@@ -1039,7 +1051,11 @@
         river: "Mula River Basin, Pune, Maharashtra",
         catchmentText: "250.00 km²",
         coeffText: "0.75",
-        warningCapText: "443.70M m³"
+        warningCapText: "443.70M m³",
+        peakInflow: "14,350 m³/s",
+        peakInflowDate: "Recorded: Sep 2021 Monsoon",
+        avgPrecip: "112.5 mm",
+        uptime: "99.97%"
       }
     };
 
@@ -1134,7 +1150,7 @@
       // Update max safe limits and metrics texts
       const safeLimitValEls = document.querySelectorAll('.text-headline-md.font-bold.text-on-surface');
       safeLimitValEls.forEach(el => {
-        if (el.textContent.includes('800')) {
+        if (el.textContent.includes('800') || el.textContent.includes('500') || el.textContent.includes('1000') || el.textContent.includes('1500')) {
           el.innerHTML = `${Math.round(dam.maxSafeDischarge)} <span class="text-[14px] text-on-surface-variant font-normal">m³/s</span>`;
         }
       });
@@ -1190,6 +1206,15 @@
 
       const satHeader = document.querySelector('#page-forecasts .lg\\:col-span-3 h3');
       if (satHeader) satHeader.innerHTML = `<span class="material-symbols-outlined text-[20px] text-secondary">satellite_alt</span> ${dam.region} Satellite`;
+
+      // Update Analytics values dynamically
+      document.getElementById('analytics-title').textContent = `${dam.name} Analytics & Historical Trends`;
+      document.getElementById('analytics-subtitle').textContent = `Detailed hydrological analysis and efficiency parameters for ${dam.name} basin.`;
+      document.getElementById('analytics-peak-inflow').textContent = dam.peakInflow;
+      document.getElementById('analytics-peak-inflow-date').textContent = dam.peakInflowDate;
+      document.getElementById('analytics-runoff-efficiency').textContent = `${(parseFloat(dam.coeffText) * 100).toFixed(1)}%`;
+      document.getElementById('analytics-avg-precipitation').textContent = dam.avgPrecip;
+      document.getElementById('analytics-uptime').textContent = dam.uptime;
     }
 
     // Handle Telemetry sync
