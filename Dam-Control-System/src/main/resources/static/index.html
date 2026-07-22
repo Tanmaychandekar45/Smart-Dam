@@ -438,6 +438,44 @@
             </table>
           </div>
         </div>
+        <!-- AI ADVISORY CONSOLE -->
+        <div id="card-ai-advisor" class="glass-card rounded-xl overflow-hidden border border-primary/30 bg-primary-container/5 p-5 flex flex-col gap-4 shadow-[0_0_15px_rgba(137,206,255,0.1)]">
+          <div class="flex justify-between items-center pb-3 border-b border-outline-variant/30">
+            <h3 class="font-label-md text-primary font-bold flex items-center gap-2 uppercase tracking-wide">
+              <span class="material-symbols-outlined text-[20px] animate-pulse">psychology_alt</span>
+              AI Advisory Console
+            </h3>
+            <span id="ai-confidence-badge" class="text-[10px] font-bold font-mono text-primary bg-primary-container/20 px-2 py-0.5 rounded border border-primary/20">CONFIDENCE: --%</span>
+          </div>
+          
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-on-surface-variant font-mono uppercase">System Risk Evaluation</span>
+              <span id="ai-risk-pill" class="px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-secondary-container/20 text-secondary border border-secondary/30">NOMINAL</span>
+            </div>
+            
+            <div class="bg-background/80 rounded-lg p-3 border border-outline-variant/20">
+              <p class="text-[11px] text-on-surface-variant font-mono uppercase mb-1">Model Synthesis</p>
+              <p id="ai-advisory-msg" class="text-xs leading-relaxed text-on-surface font-sans">
+                Analyzing dam telemetry and open weather API forecast data...
+              </p>
+            </div>
+            
+            <div class="flex flex-col gap-1.5">
+              <span class="text-[11px] text-on-surface-variant font-mono uppercase">Suggested Actions</span>
+              <ul id="ai-actions-list" class="flex flex-col gap-2 text-xs text-on-surface-variant list-disc pl-4 font-sans">
+                <!-- Actions will be rendered here -->
+              </ul>
+            </div>
+
+            <div class="bg-primary/5 rounded-lg p-3 border border-primary/20 mt-1">
+              <p class="text-[11px] text-primary font-mono uppercase mb-1">Suggested Gate Schedule</p>
+              <p id="ai-gate-schedule" class="text-xs text-primary leading-relaxed font-sans font-semibold">
+                --
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1225,10 +1263,42 @@
         const data = await res.json();
         
         updateUI(data.state, data.latestLog);
+
+        // Fetch AI recommendation
+        const aiRes = await fetch(`${API_BASE}/${currentDamId}/ai-recommendation`);
+        if (aiRes.ok) {
+          const aiData = await aiRes.json();
+          updateAiAdvisor(aiData);
+        }
       } catch (err) {
         console.error(err);
         decisionLogText.textContent = "Error synchronizing with the dam monitoring system: " + err.message;
       }
+    }
+
+    function updateAiAdvisor(rec) {
+      document.getElementById('ai-confidence-badge').textContent = `CONFIDENCE: ${rec.confidenceScore}%`;
+      
+      const riskPill = document.getElementById('ai-risk-pill');
+      riskPill.textContent = rec.riskLevel;
+      if (rec.riskLevel === 'CRITICAL') {
+        riskPill.className = "px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-error-container/20 text-error border border-error/30 animate-pulse";
+      } else if (rec.riskLevel === 'WARNING') {
+        riskPill.className = "px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-tertiary/20 text-tertiary border border-tertiary/30";
+      } else {
+        riskPill.className = "px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-secondary-container/20 text-secondary border border-secondary/30";
+      }
+      
+      document.getElementById('ai-advisory-msg').textContent = rec.advisoryMessage;
+      document.getElementById('ai-gate-schedule').textContent = rec.gateScheduleRecommendation;
+      
+      const actionsList = document.getElementById('ai-actions-list');
+      actionsList.innerHTML = '';
+      rec.suggestedActions.forEach(action => {
+        const li = document.createElement('li');
+        li.textContent = action;
+        actionsList.appendChild(li);
+      });
     }
 
     function updateUI(state, logData) {

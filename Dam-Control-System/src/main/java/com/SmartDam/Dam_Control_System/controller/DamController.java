@@ -6,6 +6,7 @@ import com.SmartDam.Dam_Control_System.repository.ControlLogRepository;
 import com.SmartDam.Dam_Control_System.repository.ReservoirStateRepository;
 import com.SmartDam.Dam_Control_System.service.DamControlEngineService;
 import com.SmartDam.Dam_Control_System.service.WeatherForecastService;
+import com.SmartDam.Dam_Control_System.service.AiSuggestionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -25,15 +26,18 @@ public class DamController {
     private final ControlLogRepository controlLogRepository;
     private final DamControlEngineService damControlEngineService;
     private final WeatherForecastService weatherForecastService;
+    private final AiSuggestionService aiSuggestionService;
 
     public DamController(ReservoirStateRepository reservoirStateRepository,
                          ControlLogRepository controlLogRepository,
                          DamControlEngineService damControlEngineService,
-                         WeatherForecastService weatherForecastService) {
+                         WeatherForecastService weatherForecastService,
+                         AiSuggestionService aiSuggestionService) {
         this.reservoirStateRepository = reservoirStateRepository;
         this.controlLogRepository = controlLogRepository;
         this.damControlEngineService = damControlEngineService;
         this.weatherForecastService = weatherForecastService;
+        this.aiSuggestionService = aiSuggestionService;
     }
 
     /**
@@ -176,5 +180,23 @@ public class DamController {
         public void setWaterLevelMeters(double waterLevelMeters) {
             this.waterLevelMeters = waterLevelMeters;
         }
+    }
+
+    /**
+     * GET /api/v1/dam/ai-recommendation
+     */
+    @GetMapping("/ai-recommendation")
+    public ResponseEntity<com.SmartDam.Dam_Control_System.dto.AiRecommendationResponse> getAiRecommendation() {
+        return getAiRecommendation("erai");
+    }
+
+    /**
+     * GET /api/v1/dam/{damId}/ai-recommendation
+     */
+    @GetMapping("/{damId}/ai-recommendation")
+    public ResponseEntity<com.SmartDam.Dam_Control_System.dto.AiRecommendationResponse> getAiRecommendation(@PathVariable String damId) {
+        log.info("Received request for AI Recommendation for dam: {}", damId);
+        com.SmartDam.Dam_Control_System.dto.AiRecommendationResponse recommendation = aiSuggestionService.generateRecommendation(damId);
+        return ResponseEntity.ok(recommendation);
     }
 }
