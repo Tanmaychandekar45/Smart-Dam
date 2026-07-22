@@ -1847,20 +1847,28 @@
       }
     });
 
-    // Systems Diagnostics Modal handlers
-    document.getElementById('gate-info-btn').addEventListener('click', () => {
-      document.getElementById('diagnostics-modal').classList.remove('hidden');
-    });
-
-    document.getElementById('close-diagnostics-btn').addEventListener('click', () => {
-      document.getElementById('diagnostics-modal').classList.add('hidden');
-    });
-
     // Initial load
     window.addEventListener('DOMContentLoaded', () => {
       updateStaticDamDetails();
       switchTab(navTelemetry, pageTelemetry);
       loadDamStatus();
+
+      // Systems Diagnostics Modal handlers
+      const gateInfoBtn = document.getElementById('gate-info-btn');
+      const closeDiagBtn = document.getElementById('close-diagnostics-btn');
+      const diagModal = document.getElementById('diagnostics-modal');
+
+      if (gateInfoBtn && diagModal) {
+        gateInfoBtn.addEventListener('click', () => {
+          diagModal.classList.remove('hidden');
+        });
+      }
+
+      if (closeDiagBtn && diagModal) {
+        closeDiagBtn.addEventListener('click', () => {
+          diagModal.classList.add('hidden');
+        });
+      }
     });
 
     // Generate PDF Report
