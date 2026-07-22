@@ -199,4 +199,65 @@ public class DamController {
         com.SmartDam.Dam_Control_System.dto.AiRecommendationResponse recommendation = aiSuggestionService.generateRecommendation(damId);
         return ResponseEntity.ok(recommendation);
     }
+
+    /**
+     * POST /api/v1/dam/{damId}/submit-decision
+     */
+    @PostMapping("/{damId}/submit-decision")
+    public ResponseEntity<ControlLog> submitDecision(@PathVariable String damId) {
+        log.info("Submitting latest decision log to higher authority for dam: {}", damId);
+        com.SmartDam.Dam_Control_System.entity.DamMetadata meta = com.SmartDam.Dam_Control_System.entity.DamMetadata.get(damId);
+        
+        ControlLog logEntry = controlLogRepository.findFirstByDamIdOrderByTimestampDesc(meta.getId())
+                .orElseThrow(() -> new IllegalArgumentException("No log found to submit."));
+        
+        logEntry.setApprovalStatus("PENDING_AUTHORITY");
+        controlLogRepository.save(logEntry);
+        return ResponseEntity.ok(logEntry);
+    }
+
+    /**
+     * POST /api/v1/dam/{damId}/authority-action
+     */
+    @PostMapping("/{damId}/authority-action")
+    public ResponseEntity<ControlLog> authorityAction(
+            @PathVariable String damId,
+            @RequestParam String action,
+            @RequestParam(required = false) Double manualOutflow) {
+        log.info("Authority action received for dam: {}. Action: {}, ManualOutflow: {}", damId, action, manualOutflow);
+        com.SmartDam.Dam_Control_System.entity.DamMetadata meta = com.SmartDam.Dam_Control_System.entity.DamMetadata.get(damId);
+        
+        ControlLog logEntry = controlLogRepository.findFirstByDamIdOrderByTimestampDesc(meta.getId())
+                .orElseThrow(() -> new IllegalArgumentException("No log found to act on."));
+
+        ReservoirState state = reservoirStateRepository.findFirstByDamIdOrderByTimestampDesc(meta.getId())
+                .orElseThrow(() -> new IllegalArgumentException("No reservoir state found."));
+
+        if ("APPROVE".equalsIgnoreCase(action)) {
+            logEntry.setApprovalStatus("APPROVED");
+            logEntry.setStatusMessage("[APPROVED BY AUTHORITY] " + logEntry.getStatusMessage());
+            
+            double targetOutflow = logEntry.getRecommendedOutflowM3s();
+            state.setCurrentOutflowM3s(targetOutflow);
+            
+            double openPercent = (targetOutflow / meta.getMaxSafeDischargeM3s()) * 100.0;
+            state.setGateOpenPercentage(Math.min(100.0, Math.max(0.0, openPercent)));
+            
+            reservoirStateRepository.save(state);
+        } else {
+            logEntry.setApprovalStatus("REJECTED");
+            double outflowOverride = (manualOutflow != null) ? manualOutflow : 0.0;
+            logEntry.setRecommendedOutflowM3s(outflowOverride);
+            logEntry.setStatusMessage(String.format("[OVERRIDDEN BY AUTHORITY] Outflow locked at %.2f m³/s manually.", outflowOverride));
+            
+            state.setCurrentOutflowM3s(outflowOverride);
+            double openPercent = (outflowOverride / meta.getMaxSafeDischargeM3s()) * 100.0;
+            state.setGateOpenPercentage(Math.min(100.0, Math.max(0.0, openPercent)));
+            
+            reservoirStateRepository.save(state);
+        }
+
+        controlLogRepository.save(logEntry);
+        return ResponseEntity.ok(logEntry);
+    }
 }

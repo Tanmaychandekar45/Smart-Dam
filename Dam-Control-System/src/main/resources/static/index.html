@@ -474,6 +474,64 @@
                 --
               </p>
             </div>
+
+            <div class="flex flex-col gap-2 pt-3 border-t border-outline-variant/30 mt-2">
+              <div class="flex items-center justify-between text-xs font-mono text-on-surface-variant">
+                <span>APPROVAL STATE:</span>
+                <span id="decision-approval-badge" class="font-bold text-secondary uppercase">OPERATOR DRAFT</span>
+              </div>
+              <button id="submit-authority-btn" class="w-full bg-secondary hover:bg-secondary/80 text-on-secondary font-bold py-2 px-3 rounded text-xs uppercase flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all">
+                <span class="material-symbols-outlined text-[16px]">send</span>
+                Submit recommendation to Authority
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SIMULATED HIGHER AUTHORITY REVIEW PANEL -->
+        <div id="card-authority-panel" class="glass-card rounded-xl overflow-hidden border border-tertiary/30 bg-tertiary/5 p-5 flex flex-col gap-4 shadow-[0_0_15px_rgba(255,182,193,0.05)] hidden">
+          <div class="flex justify-between items-center pb-3 border-b border-outline-variant/30">
+            <h3 class="font-label-md text-tertiary font-bold flex items-center gap-2 uppercase tracking-wide">
+              <span class="material-symbols-outlined text-[20px] animate-pulse">verified_user</span>
+              Authority Review Panel
+            </h3>
+            <span class="text-[9px] font-bold font-mono text-tertiary bg-tertiary/20 px-2 py-0.5 rounded border border-tertiary/20">ROLE: GOVT. COMMISSIONER</span>
+          </div>
+
+          <div class="flex flex-col gap-3">
+            <p class="text-xs text-on-surface-variant leading-relaxed">
+              As a member of the Higher Authority, you must review the pending hydrological advisory below and choose to deploy the recommendation or manually override the discharge.
+            </p>
+
+            <div class="bg-background/80 rounded-lg p-3 border border-outline-variant/20 text-xs">
+              <div class="flex justify-between mb-1">
+                <span class="font-mono text-on-surface-variant uppercase">Proposed Release:</span>
+                <span id="auth-proposed-flow" class="font-bold text-primary">-- m³/s</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="font-mono text-on-surface-variant uppercase">Precipitation:</span>
+                <span id="auth-proposed-rain" class="font-bold text-on-surface">-- mm</span>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <button id="auth-approve-btn" class="flex-1 bg-primary hover:bg-primary-container text-on-primary font-bold py-2 rounded text-xs uppercase flex items-center justify-center gap-1 active:scale-[0.98] transition-all">
+                <span class="material-symbols-outlined text-[16px]">done</span>
+                Approve Strategy
+              </button>
+              <button id="auth-reject-btn" class="flex-1 bg-error/20 hover:bg-error/30 text-error font-bold py-2 rounded text-xs uppercase flex items-center justify-center gap-1 border border-error/30 active:scale-[0.98] transition-all">
+                <span class="material-symbols-outlined text-[16px]">close</span>
+                Reject / Override
+              </button>
+            </div>
+
+            <div id="auth-override-controls" class="hidden flex flex-col gap-2 pt-2 border-t border-outline-variant/20">
+              <label class="text-[11px] font-mono text-on-surface-variant uppercase">Manual Outflow Override (m³/s)</label>
+              <div class="flex gap-2">
+                <input id="auth-override-flow-input" type="number" min="0" max="2000" step="10" placeholder="e.g. 250" class="flex-1 bg-surface-container border border-outline-variant rounded px-2 py-1 text-xs text-on-surface font-mono" />
+                <button id="auth-override-submit-btn" class="bg-tertiary hover:bg-tertiary/80 text-on-tertiary font-bold px-3 py-1 rounded text-xs uppercase active:scale-[0.98] transition-all">Apply</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1477,6 +1535,45 @@
           rdy.textContent = "NORMAL";
         });
       }
+
+      // Update decision approval status in AI card
+      const approvalBadge = document.getElementById('decision-approval-badge');
+      const submitBtn = document.getElementById('submit-authority-btn');
+      const authPanel = document.getElementById('card-authority-panel');
+      const status = logData.approvalStatus || 'PENDING_OPERATOR';
+      
+      approvalBadge.textContent = status.replace('_', ' ');
+      
+      // Update the proposed outflow values inside the Authority review panel
+      document.getElementById('auth-proposed-flow').textContent = `${logData.recommendedOutflowM3s.toFixed(1)} m³/s`;
+      document.getElementById('auth-proposed-rain').textContent = `${logData.forecastPrecipitationMm.toFixed(1)} mm`;
+
+      if (status === 'PENDING_OPERATOR') {
+        approvalBadge.className = "font-bold text-secondary uppercase";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Submit recommendation to Authority";
+        submitBtn.className = "w-full bg-secondary hover:bg-secondary/80 text-on-secondary font-bold py-2 px-3 rounded text-xs uppercase flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all";
+        authPanel.classList.add('hidden');
+      } else if (status === 'PENDING_AUTHORITY') {
+        approvalBadge.className = "font-bold text-tertiary uppercase animate-pulse";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Awaiting Authority Decision...";
+        submitBtn.className = "w-full bg-surface-container text-on-surface-variant/40 font-bold py-2 px-3 rounded text-xs uppercase flex items-center justify-center gap-1.5 cursor-not-allowed";
+        authPanel.classList.remove('hidden');
+        document.getElementById('auth-override-controls').classList.add('hidden');
+      } else if (status === 'APPROVED') {
+        approvalBadge.className = "font-bold text-primary uppercase";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Approved & Deployed";
+        submitBtn.className = "w-full bg-primary/10 text-primary border border-primary/20 font-bold py-2 px-3 rounded text-xs uppercase flex items-center justify-center gap-1.5 cursor-not-allowed";
+        authPanel.classList.add('hidden');
+      } else if (status === 'REJECTED') {
+        approvalBadge.className = "font-bold text-error uppercase";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Rejected / Overridden";
+        submitBtn.className = "w-full bg-error/10 text-error border border-error/20 font-bold py-2 px-3 rounded text-xs uppercase flex items-center justify-center gap-1.5 cursor-not-allowed";
+        authPanel.classList.add('hidden');
+      }
     }
 
     // Selector Change Listener
@@ -1719,6 +1816,47 @@
 
     refreshBtn.addEventListener('click', () => {
       loadDamStatus();
+    });
+
+    // Authority approval workflow button listeners
+    document.getElementById('submit-authority-btn').addEventListener('click', async () => {
+      try {
+        const res = await fetch(`${API_BASE}/${currentDamId}/submit-decision`, { method: 'POST' });
+        if (!res.ok) throw new Error('Submission failed');
+        loadDamStatus();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('auth-approve-btn').addEventListener('click', async () => {
+      try {
+        const res = await fetch(`${API_BASE}/${currentDamId}/authority-action?action=APPROVE`, { method: 'POST' });
+        if (!res.ok) throw new Error('Approval action failed');
+        loadDamStatus();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('auth-reject-btn').addEventListener('click', () => {
+      const controls = document.getElementById('auth-override-controls');
+      controls.classList.toggle('hidden');
+    });
+
+    document.getElementById('auth-override-submit-btn').addEventListener('click', async () => {
+      const inputVal = document.getElementById('auth-override-flow-input').value;
+      if (!inputVal) {
+        alert('Please specify override outflow value');
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/${currentDamId}/authority-action?action=REJECT&manualOutflow=${inputVal}`, { method: 'POST' });
+        if (!res.ok) throw new Error('Override action failed');
+        loadDamStatus();
+      } catch (err) {
+        alert(err.message);
+      }
     });
 
     // Initial load

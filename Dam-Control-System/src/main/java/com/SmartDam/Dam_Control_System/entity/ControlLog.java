@@ -26,9 +26,15 @@ public class ControlLog {
     @Column(length = 1000)
     private String statusMessage;
 
+    private String approvalStatus = "PENDING_OPERATOR";
+
     public ControlLog() {}
 
     public ControlLog(Long id, String damId, LocalDateTime timestamp, double forecastPrecipitationMm, double predictedInflowM3, double recommendedOutflowM3s, boolean floodAlertTriggered, String statusMessage) {
+        this(id, damId, timestamp, forecastPrecipitationMm, predictedInflowM3, recommendedOutflowM3s, floodAlertTriggered, statusMessage, "PENDING_OPERATOR");
+    }
+
+    public ControlLog(Long id, String damId, LocalDateTime timestamp, double forecastPrecipitationMm, double predictedInflowM3, double recommendedOutflowM3s, boolean floodAlertTriggered, String statusMessage, String approvalStatus) {
         this.id = id;
         this.damId = damId;
         this.timestamp = timestamp;
@@ -37,6 +43,7 @@ public class ControlLog {
         this.recommendedOutflowM3s = recommendedOutflowM3s;
         this.floodAlertTriggered = floodAlertTriggered;
         this.statusMessage = statusMessage;
+        this.approvalStatus = approvalStatus;
     }
 
     public Long getId() { return id; }
@@ -63,6 +70,9 @@ public class ControlLog {
     public String getStatusMessage() { return statusMessage; }
     public void setStatusMessage(String statusMessage) { this.statusMessage = statusMessage; }
 
+    public String getApprovalStatus() { return approvalStatus; }
+    public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }
+
     public static ControlLogBuilder builder() {
         return new ControlLogBuilder();
     }
@@ -76,6 +86,7 @@ public class ControlLog {
         private double recommendedOutflowM3s;
         private boolean floodAlertTriggered;
         private String statusMessage;
+        private String approvalStatus = "PENDING_OPERATOR";
 
         public ControlLogBuilder id(Long id) { this.id = id; return this; }
         public ControlLogBuilder damId(String damId) { this.damId = damId; return this; }
@@ -85,9 +96,10 @@ public class ControlLog {
         public ControlLogBuilder recommendedOutflowM3s(double recommendedOutflowM3s) { this.recommendedOutflowM3s = recommendedOutflowM3s; return this; }
         public ControlLogBuilder floodAlertTriggered(boolean floodAlertTriggered) { this.floodAlertTriggered = floodAlertTriggered; return this; }
         public ControlLogBuilder statusMessage(String statusMessage) { this.statusMessage = statusMessage; return this; }
+        public ControlLogBuilder approvalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; return this; }
 
         public ControlLog build() {
-            return new ControlLog(id, damId, timestamp, forecastPrecipitationMm, predictedInflowM3, recommendedOutflowM3s, floodAlertTriggered, statusMessage);
+            return new ControlLog(id, damId, timestamp, forecastPrecipitationMm, predictedInflowM3, recommendedOutflowM3s, floodAlertTriggered, statusMessage, approvalStatus);
         }
     }
 }
