@@ -27,17 +27,20 @@ public class DamController {
     private final DamControlEngineService damControlEngineService;
     private final WeatherForecastService weatherForecastService;
     private final AiSuggestionService aiSuggestionService;
+    private final com.SmartDam.Dam_Control_System.repository.EmergencyAlertRepository emergencyAlertRepository;
 
     public DamController(ReservoirStateRepository reservoirStateRepository,
                          ControlLogRepository controlLogRepository,
                          DamControlEngineService damControlEngineService,
                          WeatherForecastService weatherForecastService,
-                         AiSuggestionService aiSuggestionService) {
+                         AiSuggestionService aiSuggestionService,
+                         com.SmartDam.Dam_Control_System.repository.EmergencyAlertRepository emergencyAlertRepository) {
         this.reservoirStateRepository = reservoirStateRepository;
         this.controlLogRepository = controlLogRepository;
         this.damControlEngineService = damControlEngineService;
         this.weatherForecastService = weatherForecastService;
         this.aiSuggestionService = aiSuggestionService;
+        this.emergencyAlertRepository = emergencyAlertRepository;
     }
 
     /**
@@ -259,5 +262,45 @@ public class DamController {
 
         controlLogRepository.save(logEntry);
         return ResponseEntity.ok(logEntry);
+    }
+
+    /**
+     * POST /api/v1/dam/{damId}/emergency-alert
+     */
+    @PostMapping("/{damId}/emergency-alert")
+    public ResponseEntity<com.SmartDam.Dam_Control_System.entity.EmergencyAlert> createEmergencyAlert(
+            @PathVariable String damId,
+            @RequestParam String priority,
+            @RequestParam String message,
+            @RequestParam String shiftOfficerName) {
+        log.info("Creating emergency alert for dam: {}. Priority: {}, Officer: {}", damId, priority, shiftOfficerName);
+        com.SmartDam.Dam_Control_System.entity.EmergencyAlert alert = new com.SmartDam.Dam_Control_System.entity.EmergencyAlert(
+                null, damId, priority, message, LocalDateTime.now(), shiftOfficerName, false
+        );
+        emergencyAlertRepository.save(alert);
+        return ResponseEntity.ok(alert);
+    }
+
+    /**
+     * GET /api/v1/dam/alerts
+     */
+    @GetMapping("/alerts")
+    public ResponseEntity<java.util.List<com.SmartDam.Dam_Control_System.entity.EmergencyAlert>> getActiveAlerts() {
+        log.info("Fetching all active/unresolved emergency alerts");
+        java.util.List<com.SmartDam.Dam_Control_System.entity.EmergencyAlert> alerts = emergencyAlertRepository.findByResolvedOrderByTimestampDesc(false);
+        return ResponseEntity.ok(alerts);
+    }
+
+    /**
+     * POST /api/v1/dam/alert/{id}/resolve
+     */
+    @PostMapping("/alert/{id}/resolve")
+    public ResponseEntity<Void> resolveAlert(@PathVariable Long id) {
+        log.info("Resolving emergency alert ID: {}", id);
+        com.SmartDam.Dam_Control_System.entity.EmergencyAlert alert = emergencyAlertRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Alert not found"));
+        alert.setResolved(true);
+        emergencyAlertRepository.save(alert);
+        return ResponseEntity.ok().build();
     }
 }
