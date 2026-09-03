@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DamControlSystem/DamControlSystem.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DamControlSystem.Tests/DamControlSystem.Tests.csproj" />
+  </Folder>
+</Solution>
